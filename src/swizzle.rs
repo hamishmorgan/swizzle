@@ -144,7 +144,7 @@ macro_rules! swizzle {
             #[doc = "]" ]
             #[must_use]
             #[inline]
-            pub fn [< $($value)+ >](&self) -> $self {
+            pub const fn [< $($value)+ >](&self) -> $self {
                 $self { $( $field: self.$value ),* }
             }
         }
@@ -655,4 +655,22 @@ mod tests {
         let ab = s.ab();
         assert_eq!((ab.a, ab.b), (1, 2));
     }
+
+
+    // TODO: Support for generic types; e.g `MyStruct<T>`
+    // #[test]
+    // fn test_swizzle_with_generic_field_types() {
+    //     struct TestStruct<T> {
+    //         a: T,
+    //         b: T,
+    //     }
+
+    //     swizzle!(TestStruct<T>, a, b);
+
+    //     let s = TestStruct { a: 1, b: 2 };
+
+    //     let ab = s.ab();
+    //     assert_eq!((ab.a, ab.b), (1, 2));
+    // }
+
 }
