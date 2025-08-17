@@ -144,8 +144,8 @@ macro_rules! swizzle {
             #[doc = "]" ]
             #[must_use]
             #[inline]
-            pub fn [< $($value)+ >](&self) -> Self {
-                Self { $( $field: self.$value ),* }
+            pub fn [< $($value)+ >](&self) -> $self {
+                $self { $( $field: self.$value ),* }
             }
         }
     };
@@ -184,7 +184,7 @@ macro_rules! swizzle {
             $($field),+,
             @{
                 ( $($src_tail)* )            // Munch src
-                ( $($dst)* )                 // Add the dst to the destination
+                ( $($dst)* )                 // Pass through existing dst
             }
         );
     };
@@ -254,6 +254,7 @@ mod tests {
 
     #[test]
     fn test_swizzle_struct_2_fields() {
+        #[derive(Debug, PartialEq)]
         struct TestStruct {
             a: u8,
             b: u8,
@@ -278,6 +279,8 @@ mod tests {
         let ba = s2.ba();
         assert_eq!(ba.a, 2);
         assert_eq!(ba.b, 1);
+
+        assert_eq!(s2.ba().ba(), s2);
     }
 
     #[test]
