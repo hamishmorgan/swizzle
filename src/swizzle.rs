@@ -222,6 +222,7 @@ macro_rules! swizzle {
             #[doc = "Functions to swizzle a `" ]
             #[doc = stringify!( $self ) ]
             #[doc = "`."]
+            #[allow(non_local_definitions)]
             impl $self {
                 swizzle!(
                     @ { $($field)+ }    // Copy of fields to be used to count depth of the outer recursion
@@ -237,6 +238,7 @@ macro_rules! swizzle {
     };
 }
 
+#[allow(dead_code)]
 #[cfg(test)]
 mod tests {
     #[test]
@@ -339,6 +341,15 @@ mod tests {
 
         let bbc = s3.bbc();
         assert_eq!((bbc.a, bbc.b, bbc.c), (2, 2, 3));
+
+        let bca = s3.bca();
+        assert_eq!((bca.a, bca.b, bca.c), (2, 3, 1));
+
+        let bcb = s3.bcb();
+        assert_eq!((bcb.a, bcb.b, bcb.c), (2, 3, 2));
+
+        let bcc = s3.bcc();
+        assert_eq!((bcc.a, bcc.b, bcc.c), (2, 3, 3));
 
         let caa = s3.caa();
         assert_eq!((caa.a, caa.b, caa.c), (3, 1, 1));
