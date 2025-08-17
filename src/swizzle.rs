@@ -127,8 +127,16 @@
 /// in the returned struct, in the same order.
 #[macro_export]
 macro_rules! swizzle {
-    // Base case: when we have processed all fields, generate the actual function
-    (@{} $self:path, $($field:ident),+, @{ ( $($_:ident)+ ) -> ( $($value:ident)+ ) }) => {
+    // Outer recursion termination case: when depth fields is empty, generate the actual function
+    (
+        @{}                       // Depth of recursion: empty/final on function generation
+        $self:path,               // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+        $($field:ident),+,        // Comma separated field names, which has been passed down unaltered from entry point
+        @{
+            ( $($_:ident)+ )      // Source value. Unused at the final depth
+            ( $($value:ident)+ )  // Destination values.
+        }
+    ) => {
         paste::paste! {
             #[doc = "Get a new `" ]
             #[doc = stringify!( $self ) ]
@@ -137,30 +145,93 @@ macro_rules! swizzle {
             #[must_use]
             #[inline]
             pub fn [< $($value)+ >](&self) -> Self {
-                Self { $($field: self.$value),* }
+                Self { $( $field: self.$value ),* }
             }
         }
     };
 
-    // Recursive case: process the head field and continue with the tail
-    // This rule handles the recursive generation of all possible combinations
-    (@ { $h:ident $($t:ident)* } $self:path, $($field:ident),+, @{ ( $head:ident $($tail:ident)* ) -> ( $($a:ident)* ) }) => {
-        swizzle!(@{ $($t)* } $self, $($field),+, @{ ( $($field)+ ) -> ( $($a)* $head ) } );
-        swizzle!(@{ $h $($t)* } $self, $($field),+, @{ ( $($tail)* ) -> ( $($a)* ) } );
+    // Recursive case
+    //
+    // E.g:
+    //
+    // (@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) }) => {
+    //     swizzle!(@{g b}, rgb::Rgb, g, b, @{ (g b) (r) })
+    //     swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) })
+    // }
+    (
+        @ { $depth_head:ident $($depth_tail:ident)* } // Depth of the recursion
+        $self:path,                                   // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+        $($field:ident),+,                            // Comma separated field names, which has been passed down unaltered from entry point
+        @{
+            ( $src_head:ident $($src_tail:ident)* )   // Source values
+            ( $($dst:ident)* )                        // Destination values.
+        }
+    ) => {
+        // Outer recursion: Add the src head to the destination, reset the src to the full fields set, and continue at the next depth
+        swizzle!(
+            @{ $($depth_tail)* }         // Munch depth
+            $self,
+            $($field),+,
+            @{
+                ( $($field)+ )           // Refill the src with all fields
+                ( $($dst)* $src_head )   // Add the src head to the destination
+            }
+        );
+        // Inner recursion: Repeat the above process for the tail src fields until they are empty
+        swizzle!(
+            @{ $depth_head $($depth_tail)* } // Same depth
+            $self,
+            $($field),+,
+            @{
+                ( $($src_tail)* )            // Munch src
+                ( $($dst)* )                 // Add the dst to the destination
+            }
+        );
     };
 
-    // Termination case: when no more fields to process, do nothing
-    (@ { $h:ident $($t:ident)* } $self:path, $($field:ident),+, @{ ( ) -> ( $($a:ident)* ) } ) => {};
+    // Inner recursion termination case: When no more fields to process at the given depth, do nothing
+    //
+    // E.g:
+    //
+    // (@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) }) => nothing!
+    (
+        @ { $($depth:ident)+ } // Depth of the recursion
+        $self:path,            // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+        $($field:ident),+,     // Comma separated field names, which has been passed down unaltered from entry point
+        @{
+            ( )                // Source value. Empty on termination at the given depth
+            ( $($dst:ident)* ) // Destination values.
+        }
+    ) => {};
 
     // Entry point: start the recursive generation process
-    // This rule initiates the macro expansion and creates the impl block
-    ($self:path, $($field:ident),+ $(,)? ) => {
+    //
+    // E.g:
+    //
+    // /// Functions to swizzle a `rgb::Rgb`.
+    // (rgb::Rgb, r, g, b) => {
+    //     impl rgb::Rgb {
+    //         swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) })
+    //    }
+    // }
+    (
+        $self:path,              // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+        $($field:ident),+ $(,)?  // Comma separated field names, with an optional trailing comma (e.g `x, y`)
+    ) => {
         paste::paste! {
             #[doc = "Functions to swizzle a `" ]
             #[doc = stringify!( $self ) ]
             #[doc = "`."]
             impl $self {
-                swizzle!(@ { $($field)+ } $self, $($field),+, @{ ( $($field)+ ) -> ( ) } );
+                swizzle!(
+                    @ { $($field)+ }    // Copy of fields to be used to count depth of the outer recursion
+                    $self,
+                    $($field),+,        // Original fields list, passed down unaltered to be re-used at each depth
+                    @{
+                        ( $($field)+ )  // Another copy of the fields, used populate the src at each depth
+                        ( )             // Empty tuple for the destination value
+                    }
+                );
             }
         }
     };
