@@ -1,6 +1,7 @@
 # Swizzle
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://github.com/hamishmorgan/swizzle/actions/workflows/rust.yml/badge.svg)](https://github.com/hamishmorgan/swizzle/actions/workflows/rust.yml)
 
 Rust macro for generating swizzle functions on structs. The `swizzle!` macro automatically generates functions that allow you to create new instances of a struct with field values rearranged according to any combination of the original fields.
 
