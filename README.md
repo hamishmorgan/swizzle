@@ -142,3 +142,15 @@ This crate depends on the `paste` crate for hygienic macro expansion.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Limitations / Todo
+
+These features are not supported and maybe I'll add them one day:
+
+ - Migrate to a stand rust edition/version
+ - Generic types; e.g `MyStruct<T>`
+ - Shortening swizzles; e.g `let v: Vec2 = Vec3 {x:1, y:2, z:3}.xy()`
+ - Extending swizzles; e.g `let v: Vec3 = Vec2 {x:1, y:2}.xxy()`
+ - Make less useful swizzles a feature that can disabled; e.g `rgb.rgb()` 
+ - Structs with field that implement `Clone` but not `Copy`.
+ - 
