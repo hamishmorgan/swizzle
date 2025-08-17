@@ -132,7 +132,7 @@ For each possible combination of field names, the macro generates a function nam
 ## Limitations
 
 - Field names must be valid Rust identifiers
-- All fields must be of types that can be copied
+- All fields must be of types with the `Copy` trait
 - The macro generates a lot of functions for structs with many fields
 - Field order in the struct definition matters for the generated function names
 

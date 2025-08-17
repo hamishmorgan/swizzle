@@ -128,12 +128,15 @@
 #[macro_export]
 macro_rules! swizzle {
     // Base case: when we have processed all fields, generate the actual function
-    (@{} $self:ident, $($field:ident),+, @{ ( $($_:ident)+ ) -> ( $($value:ident)+ ) }) => {
+    (@{} $self:path, $($field:ident),+, @{ ( $($_:ident)+ ) -> ( $($value:ident)+ ) }) => {
         paste::paste! {
-            #[doc = "Get a new `" $self "` with the values swizzled: " [<$($value)+>]]
+            #[doc = "Get a new `" ]
+            #[doc = stringify!( $self ) ]
+            #[doc = "` with the values swizzled: ["  [< $($value)+ >] ]
+            #[doc = "]" ]
             #[must_use]
             #[inline]
-            pub const fn [<$($value)+>](&self) -> Self {
+            pub fn [< $($value)+ >](&self) -> Self {
                 Self { $($field: self.$value),* }
             }
         }
@@ -141,19 +144,21 @@ macro_rules! swizzle {
 
     // Recursive case: process the head field and continue with the tail
     // This rule handles the recursive generation of all possible combinations
-    (@ { $h:ident $($t:ident)* } $self:ident, $($field:ident),+, @{ ( $head:ident $($tail:ident)* ) -> ( $($a:ident)* ) }) => {
+    (@ { $h:ident $($t:ident)* } $self:path, $($field:ident),+, @{ ( $head:ident $($tail:ident)* ) -> ( $($a:ident)* ) }) => {
         swizzle!(@{ $($t)* } $self, $($field),+, @{ ( $($field)+ ) -> ( $($a)* $head ) } );
         swizzle!(@{ $h $($t)* } $self, $($field),+, @{ ( $($tail)* ) -> ( $($a)* ) } );
     };
 
     // Termination case: when no more fields to process, do nothing
-    (@ { $h:ident $($t:ident)* } $self:ident, $($field:ident),+, @{ ( ) -> ( $($a:ident)* ) } ) => {};
+    (@ { $h:ident $($t:ident)* } $self:path, $($field:ident),+, @{ ( ) -> ( $($a:ident)* ) } ) => {};
 
     // Entry point: start the recursive generation process
     // This rule initiates the macro expansion and creates the impl block
-    ($self:ident, $($field:ident),+ $(,)? ) => {
+    ($self:path, $($field:ident),+ $(,)? ) => {
         paste::paste! {
-            #[doc = "Functions to swizzle a `" $self "`."]
+            #[doc = "Functions to swizzle a `" ]
+            #[doc = stringify!( $self ) ]
+            #[doc = "`."]
             impl $self {
                 swizzle!(@ { $($field)+ } $self, $($field),+, @{ ( $($field)+ ) -> ( ) } );
             }
@@ -300,10 +305,15 @@ mod tests {
 
         swizzle!(TestStruct, a, b, c, d);
 
-        let s4 = TestStruct { a: 1, b: 2, c: 3, d: 4 };
+        let s4 = TestStruct {
+            a: 1,
+            b: 2,
+            c: 3,
+            d: 4,
+        };
 
         // Test some key combinations (testing all 256 would be excessive)
-        
+
         let aaaa = s4.aaaa();
         assert_eq!((aaaa.a, aaaa.b, aaaa.c, aaaa.d), (1, 1, 1, 1));
 
@@ -339,6 +349,50 @@ mod tests {
 
         let dabc = s4.dabc();
         assert_eq!((dabc.a, dabc.b, dabc.c, dabc.d), (4, 1, 2, 3));
+
+        let abba = s4.abba();
+        assert_eq!((abba.a, abba.b, abba.c, abba.d), (1, 2, 2, 1));
+
+        let acca = s4.acca();
+        assert_eq!((acca.a, acca.b, acca.c, acca.d), (1, 3, 3, 1));
+
+        let bccb = s4.bccb();
+        assert_eq!((bccb.a, bccb.b, bccb.c, bccb.d), (2, 3, 3, 2));
+
+        let adda = s4.adda();
+        assert_eq!((adda.a, adda.b, adda.c, adda.d), (1, 4, 4, 1));
+    }
+
+    #[test]
+    fn test_swizzle_struct_with_different_field_names() {
+        struct CustomStruct {
+            first: u8,
+            second: u8,
+            third: u8,
+        }
+
+        swizzle!(CustomStruct, first, second, third);
+
+        let s = CustomStruct {
+            first: 10,
+            second: 20,
+            third: 30,
+        };
+
+        let fff = s.firstfirstfirst();
+        assert_eq!(fff.first, 10);
+        assert_eq!(fff.second, 10);
+        assert_eq!(fff.third, 10);
+
+        let fst = s.firstsecondthird();
+        assert_eq!(fst.first, 10);
+        assert_eq!(fst.second, 20);
+        assert_eq!(fst.third, 30);
+
+        let tsf = s.thirdsecondfirst();
+        assert_eq!(tsf.first, 30);
+        assert_eq!(tsf.second, 20);
+        assert_eq!(tsf.third, 10);
     }
 
     #[test]
@@ -353,55 +407,167 @@ mod tests {
 
         swizzle!(TestStruct, a, b, c, d, e);
 
-        let s5 = TestStruct { a: 1, b: 2, c: 3, d: 4, e: 5 };
+        let s5 = TestStruct {
+            a: 1,
+            b: 2,
+            c: 3,
+            d: 4,
+            e: 5,
+        };
 
         let aaaaa = s5.aaaaa();
-        assert_eq!((aaaaa.a, aaaaa.b, aaaaa.c, aaaaa.d, aaaaa.e), (1, 1, 1, 1, 1));
+        assert_eq!(
+            (aaaaa.a, aaaaa.b, aaaaa.c, aaaaa.d, aaaaa.e),
+            (1, 1, 1, 1, 1)
+        );
 
         // Test sequential patterns
         let abcde = s5.abcde();
-        assert_eq!((abcde.a, abcde.b, abcde.c, abcde.d, abcde.e), (1, 2, 3, 4, 5));
+        assert_eq!(
+            (abcde.a, abcde.b, abcde.c, abcde.d, abcde.e),
+            (1, 2, 3, 4, 5)
+        );
 
         let edcba = s5.edcba();
-        assert_eq!((edcba.a, edcba.b, edcba.c, edcba.d, edcba.e), (5, 4, 3, 2, 1));
+        assert_eq!(
+            (edcba.a, edcba.b, edcba.c, edcba.d, edcba.e),
+            (5, 4, 3, 2, 1)
+        );
 
         // Test repeated value patterns
         let bbbbb = s5.bbbbb();
-        assert_eq!((bbbbb.a, bbbbb.b, bbbbb.c, bbbbb.d, bbbbb.e), (2, 2, 2, 2, 2));
+        assert_eq!(
+            (bbbbb.a, bbbbb.b, bbbbb.c, bbbbb.d, bbbbb.e),
+            (2, 2, 2, 2, 2)
+        );
 
         let ccccc = s5.ccccc();
-        assert_eq!((ccccc.a, ccccc.b, ccccc.c, ccccc.d, ccccc.e), (3, 3, 3, 3, 3));
+        assert_eq!(
+            (ccccc.a, ccccc.b, ccccc.c, ccccc.d, ccccc.e),
+            (3, 3, 3, 3, 3)
+        );
 
         // Test mixed patterns
         let aabcc = s5.aabcc();
-        assert_eq!((aabcc.a, aabcc.b, aabcc.c, aabcc.d, aabcc.e), (1, 1, 2, 3, 3));
+        assert_eq!(
+            (aabcc.a, aabcc.b, aabcc.c, aabcc.d, aabcc.e),
+            (1, 1, 2, 3, 3)
+        );
 
         let abcdd = s5.abcdd();
-        assert_eq!((abcdd.a, abcdd.b, abcdd.c, abcdd.d, abcdd.e), (1, 2, 3, 4, 4));
+        assert_eq!(
+            (abcdd.a, abcdd.b, abcdd.c, abcdd.d, abcdd.e),
+            (1, 2, 3, 4, 4)
+        );
 
         let aabbb = s5.aabbb();
-        assert_eq!((aabbb.a, aabbb.b, aabbb.c, aabbb.d, aabbb.e), (1, 1, 2, 2, 2));
+        assert_eq!(
+            (aabbb.a, aabbb.b, aabbb.c, aabbb.d, aabbb.e),
+            (1, 1, 2, 2, 2)
+        );
 
         // Test alternating patterns
         let ababa = s5.ababa();
-        assert_eq!((ababa.a, ababa.b, ababa.c, ababa.d, ababa.e), (1, 2, 1, 2, 1));
+        assert_eq!(
+            (ababa.a, ababa.b, ababa.c, ababa.d, ababa.e),
+            (1, 2, 1, 2, 1)
+        );
 
         let babab = s5.babab();
-        assert_eq!((babab.a, babab.b, babab.c, babab.d, babab.e), (2, 1, 2, 1, 2));
+        assert_eq!(
+            (babab.a, babab.b, babab.c, babab.d, babab.e),
+            (2, 1, 2, 1, 2)
+        );
 
         // Test circular shift patterns
         let bcdea = s5.bcdea();
-        assert_eq!((bcdea.a, bcdea.b, bcdea.c, bcdea.d, bcdea.e), (2, 3, 4, 5, 1));
+        assert_eq!(
+            (bcdea.a, bcdea.b, bcdea.c, bcdea.d, bcdea.e),
+            (2, 3, 4, 5, 1)
+        );
 
         let cdeab = s5.cdeab();
-        assert_eq!((cdeab.a, cdeab.b, cdeab.c, cdeab.d, cdeab.e), (3, 4, 5, 1, 2));
+        assert_eq!(
+            (cdeab.a, cdeab.b, cdeab.c, cdeab.d, cdeab.e),
+            (3, 4, 5, 1, 2)
+        );
 
         // Test edge cases
         let eeeee = s5.eeeee();
-        assert_eq!((eeeee.a, eeeee.b, eeeee.c, eeeee.d, eeeee.e), (5, 5, 5, 5, 5));
+        assert_eq!(
+            (eeeee.a, eeeee.b, eeeee.c, eeeee.d, eeeee.e),
+            (5, 5, 5, 5, 5)
+        );
 
         let ddddd = s5.ddddd();
-        assert_eq!((ddddd.a, ddddd.b, ddddd.c, ddddd.d, ddddd.e), (4, 4, 4, 4, 4));
+        assert_eq!(
+            (ddddd.a, ddddd.b, ddddd.c, ddddd.d, ddddd.e),
+            (4, 4, 4, 4, 4)
+        );
     }
 
+    #[test]
+    fn test_swizzle_with_str_field_types() {
+        struct TestStruct {
+            a: &'static str,
+            b: &'static str,
+        }
+
+        swizzle!(TestStruct, a, b);
+
+        let s = TestStruct { a: "a", b: "b" };
+
+        let ab = s.ab();
+        assert_eq!((ab.a, ab.b), ("a", "b"));
+
+        let ba = s.ba();
+        assert_eq!((ba.a, ba.b), ("b", "a"));
+
+        let aa = s.aa();
+        assert_eq!((aa.a, aa.b), ("a", "a"));
+
+        let bb = s.bb();
+        assert_eq!((bb.a, bb.b), ("b", "b"));
+    }
+
+    #[test]
+    fn test_swizzle_with_f64_field_types() {
+        struct TestStruct {
+            a: f64,
+            b: f64,
+        }
+
+        swizzle!(TestStruct, a, b);
+
+        let s = TestStruct { a: 1.0, b: 2.0 };
+
+        let ab = s.ab();
+        assert_eq!((ab.a, ab.b), (1.0, 2.0));
+
+        let ba = s.ba();
+        assert_eq!((ba.a, ba.b), (2.0, 1.0));
+
+        let aa = s.aa();
+        assert_eq!((aa.a, aa.b), (1.0, 1.0));
+
+        let bb = s.bb();
+        assert_eq!((bb.a, bb.b), (2.0, 2.0));
+    }
+
+    pub mod fixtures {
+        pub struct TestStruct {
+            pub a: u8,
+            pub b: u8,
+        }
+    }
+
+    #[test]
+    fn test_swizzle_path_to_self() {
+        swizzle!(fixtures::TestStruct, a, b);
+
+        let s = fixtures::TestStruct { a: 1, b: 2 };
+
+        let ab = s.ab();
+        assert_eq!((ab.a, ab.b), (1, 2));
+    }
 }
