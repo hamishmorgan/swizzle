@@ -141,22 +141,3 @@ This crate depends on the `paste` crate for hygienic macro expansion.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Changelog
-
-### 0.1.0
-- Initial release
-- Basic swizzle macro functionality
-- Support for arbitrary number of fields
-- Comprehensive test coverage
-
-## Roadmap
-
-- [ ] Support for generic types
-- [ ] Custom field type mapping
-- [ ] Performance optimizations
-- [ ] Additional utility functions
