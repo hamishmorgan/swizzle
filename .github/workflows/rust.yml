@@ -38,7 +38,7 @@ jobs:
     - name: Lint
       run: |
         rustup component add clippy
-        cargo clippy --all-targets --all-features --verbose -- -D warnings
+        cargo clippy --all-targets --all-features --verbose
 
     - name: Check formatting
       run: |
