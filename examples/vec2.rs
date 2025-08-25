@@ -7,7 +7,9 @@ fn main() {
         y: f32,
     }
 
-    swizzle!(Vec2, x, y);
+    impl Vec2 {
+        swizzle!(Vec2 { x, y });
+    }
 
     let vec = Vec2 { x: 1.5, y: 2.5 };
 

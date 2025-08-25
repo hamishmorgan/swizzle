@@ -22,7 +22,9 @@
 //!     y: f32,
 //! }
 //!
-//! swizzle!(Vec2, x, y);
+//! impl Vec2 {
+//!     swizzle!(Vec2 { x, y });
+//! }
 //!
 //! let v = Vec2 { x: 1.0, y: 2.0 };
 //! let v_swapped = v.yx();  // Vec2 { x: 2.0, y: 1.0 }
@@ -46,7 +48,9 @@
 //!     y: f32,
 //! }
 //!
-//! swizzle!(Vec2, x, y);
+//! impl Vec2 {
+//!     swizzle!(Vec2 { x, y });
+//! }
 //!
 //! let v = Vec2 { x: 1.0, y: 2.0 };
 //! assert_eq!(v.xx().x, 1.0);
@@ -69,7 +73,9 @@
 //!     z: f32,
 //! }
 //!
-//! swizzle!(Vec3, x, y, z);
+//! impl Vec3 {
+//!     swizzle!(Vec3 { x, y, z });
+//! }
 //!
 //! let v = Vec3 { x: 1.0, y: 2.0, z: 3.0 };
 //! let v_xy = v.xyy();      // Vec3 { x: 1.0, y: 2.0, z: 2.0 }
@@ -87,17 +93,52 @@
 //!     a: u8,
 //! }
 //!
-//! swizzle!(Color, r, g, b, a);
+//! impl Color {
+//!     swizzle!(Color { r, g, b, a });
+//! }
 //!
 //! let c = Color { r: 255, g: 128, b: 64, a: 255 };
 //! let c_bgr = c.bgrb();    // Color { r: 64, g: 128, b: 255, a: 64 }
 //! let c_grayscale = c.rrrr(); // Color { r: 255, g: 255, b: 255, a: 255 }
 //! ```
 //!
+//! ### Cross-Type Swizzling
+//! ```rust
+//! use swizzle::swizzle;
+//!
+//! struct Vec2 {
+//!     x: f32,
+//!     y: f32,
+//! }
+//!
+//! struct Vec3 {
+//!     x: f32,
+//!     y: f32,
+//!     z: f32,
+//! }
+//!
+//! impl Vec2 {
+//!     // Create Vec3 from Vec2 by repeating components
+//!     swizzle!(Vec3 { x: (x, y), y: (x, y), z: (x, y) });
+//! }
+//!
+//! impl Vec3 {
+//!     // Create Vec2 from Vec3 by selecting components
+//!     swizzle!(Vec2 { x: (x, y, z), y: (x, y, z) });
+//! }
+//!
+//! let v2 = Vec2 { x: 1.0, y: 2.0 };
+//! let v3 = v2.xyx(); // Vec3 { x: 1.0, y: 2.0, z: 1.0 }
+//!
+//! let v3_orig = Vec3 { x: 1.0, y: 2.0, z: 3.0 };
+//! let v2_proj = v3_orig.xy(); // Vec2 { x: 1.0, y: 2.0 }
+//! ```
+//!
 //! ## Performance Considerations
 //!
 //! - All generated functions are `#[inline]` for optimal performance
 //! - Functions are marked as `#[must_use]` to prevent accidental discarding of results
+//! - All generated functions are `const fn` for use in const contexts
 //! - The macro generates `n^n` functions for a struct with `n` fields
 //! - For large numbers of fields, consider the compilation time impact
 //!
@@ -124,6 +165,33 @@
 //! - `aaa()` → returns struct with all fields set to the value of `a`
 //! - `abc()` → returns struct with fields set to `a`, `b`, `c` respectively
 //! - `cba()` → returns struct with fields set to `c`, `b`, `a` respectively
+//!
+//! ### Advanced Usage
+//!
+//! The macro supports cross-type swizzling where you can create instances of different structs:
+//!
+//! ```rust
+//! use swizzle::swizzle;
+//!
+//! struct SourceStruct {
+//!     src1: f32,
+//!     src2: f32,
+//! }
+//!
+//! struct TargetStruct {
+//!     field1: f32,
+//!     field2: f32,
+//! }
+//!
+//! impl SourceStruct {
+//!     swizzle!(TargetStruct { field1: (src1, src2), field2: (src1, src2) });
+//! }
+//!
+//! let src = SourceStruct { src1: 1.0, src2: 2.0 };
+//! let target = src.src1src2(); // TargetStruct { field1: 1.0, field2: 2.0 }
+//! ```
+//!
+//! This creates functions that return `TargetStruct` with values from the source struct's fields.
 //!
 //! ## Dependencies
 //!

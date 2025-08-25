@@ -1,15 +1,13 @@
 [package]
 name = "swizzle"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "A powerful Rust macro for generating swizzle functions on structs"
 keywords = ["swizzle", "macro", "vector", "graphics", "math", "field-reordering"]
 categories = ["development-tools", "graphics", "mathematics"]
 license = "MIT"
-repository = "https://github.com/yourusername/swizzle"
-documentation = "https://docs.rs/swizzle"
+repository = "https://github.com/hamishmorgan/swizzle"
 readme = "README.md"
-authors = ["Your Name <your.email@example.com>"]
 
 [dependencies]
 paste = "1.0.15"

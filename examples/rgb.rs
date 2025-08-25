@@ -8,7 +8,9 @@ fn main() {
         b: u8,
     }
 
-    swizzle!(Rgb, r, g, b);
+    impl Rgb {
+        swizzle!(Rgb { r, g, b });
+    }
 
     let rgb = Rgb { r: 3, g: 5, b: 7 };
 

@@ -21,7 +21,9 @@
 ///     field3: u8,
 /// }
 ///
-/// swizzle!(MyStruct, field1, field2, field3);
+/// impl MyStruct {
+///     swizzle!(MyStruct { field1, field2, field3 });
+/// }
 /// ```
 ///
 /// # Parameters
@@ -50,7 +52,9 @@
 ///     y: f32,
 /// }
 ///
-/// swizzle!(Vec2, x, y);
+/// impl Vec2 {
+///     swizzle!(Vec2 { x, y });
+/// }
 ///
 /// let v = Vec2 { x: 1.0, y: 2.0 };
 /// let v_swapped = v.yx();  // Vec2 { x: 2.0, y: 1.0 }
@@ -68,7 +72,9 @@
 ///     z: f32,
 /// }
 ///
-/// swizzle!(Vec3, x, y, z);
+/// impl Vec3 {
+///     swizzle!(Vec3 { x, y, z });
+/// }
 ///
 /// let v = Vec3 { x: 1.0, y: 2.0, z: 3.0 };
 /// let v_xy = v.xyy();      // Vec3 { x: 1.0, y: 2.0, z: 2.0 }
@@ -87,7 +93,9 @@
 ///     a: u8,
 /// }
 ///
-/// swizzle!(Color, r, g, b, a);
+/// impl Color {
+///     swizzle!(Color { r, g, b, a });
+/// }
 ///
 /// let c = Color { r: 255, g: 128, b: 64, a: 255 };
 /// let c_bgr = c.bgrb();    // Color { r: 64, g: 128, b: 255, a: 64 }
@@ -127,116 +135,321 @@
 /// in the returned struct, in the same order.
 #[macro_export]
 macro_rules! swizzle {
-    // Outer recursion termination case: when depth fields is empty, generate the actual function
+
+    // Simple case to generate a single swizzle function. Also the terminal case for the more complex invocations.
+    // ```
+    // swizzle!(Vec2 {x: x, y: y}) =>
+    //     pub const fn xx(&self) -> Vec2 { Vec2 { x: x, y: y } }
+    // ```
     (
-        @{}                       // Depth of recursion: empty/final on function generation
-        $self:path,               // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-        $($field:ident),+,        // Comma separated field names, which has been passed down unaltered from entry point
-        @{
-            ( $($_:ident)+ )      // Source value. Unused at the final depth
-            ( $($value:ident)+ )  // Destination values.
+        $dst_type:path {
+            $( $dst_attr:ident: $src_attr:ident ),*
+            $(,)?
         }
     ) => {
         paste::paste! {
-            #[doc = "Get a new `" ]
-            #[doc = stringify!( $self ) ]
-            #[doc = "` with the values swizzled: ["  [< $($value)+ >] ]
-            #[doc = "]" ]
-            #[must_use]
-            #[inline]
-            pub const fn [< $($value)+ >](&self) -> $self {
-                $self { $( $field: self.$value ),* }
+            pub const fn [< $($src_attr)+ >](&self) -> $dst_type {
+                $dst_type { $($dst_attr: self.$src_attr),* }
             }
         }
     };
 
-    // Recursive case
-    //
-    // E.g:
-    //
-    // (@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) }) => {
-    //     swizzle!(@{g b}, rgb::Rgb, g, b, @{ (g b) (r) })
-    //     swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) })
-    // }
+    // Case for a swizzle function that creates new instances of it's own type with all
+    // combinations of attributes.
+    // ```
+    // swizzle!(Vec2 {x, y}) =>
+    //     pub const fn xx(&self) -> Vec2 { Vec2 { x: self.x, y: self.x } }
+    //     pub const fn xy(&self) -> Vec2 { Vec2 { x: self.x, y: self.y } }
+    //     pub const fn yx(&self) -> Vec2 { Vec2 { x: self.y, y: self.x } }
+    //     pub const fn yy(&self) -> Vec2 { Vec2 { x: self.y, y: self.y } }
+    // ```
     (
-        @ { $depth_head:ident $($depth_tail:ident)* } // Depth of the recursion
-        $self:path,                                   // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-        $($field:ident),+,                            // Comma separated field names, which has been passed down unaltered from entry point
-        @{
-            ( $src_head:ident $($src_tail:ident)* )   // Source values
-            ( $($dst:ident)* )                        // Destination values.
+        $dst_type:path {
+            $( $attr:ident ),*
+            $(,)?
         }
     ) => {
-        // Outer recursion: Add the src head to the destination, reset the src to the full fields set, and continue at the next depth
+        // Before we can generate the swizzle functions we need to build out the list of source
+        // attributes, which is a copy of the destination attributes for each destination
+        // attribute.
         swizzle!(
-            @{ $($depth_tail)* }         // Munch depth
-            $self,
-            $($field),+,
-            @{
-                ( $($field)+ )           // Refill the src with all fields
-                ( $($dst)* $src_head )   // Add the src head to the destination
-            }
-        );
-        // Inner recursion: Repeat the above process for the tail src fields until they are empty
-        swizzle!(
-            @{ $depth_head $($depth_tail)* } // Same depth
-            $self,
-            $($field),+,
-            @{
-                ( $($src_tail)* )            // Munch src
-                ( $($dst)* )                 // Pass through existing dst
-            }
+            $dst_type;
+            @bld { $( $attr ),* }
+            @src { }
+            @dst { $( $attr ),* }
+            @out { }
         );
     };
 
-    // Inner recursion termination case: When no more fields to process at the given depth, do nothing
-    //
-    // E.g:
-    //
-    // (@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) }) => nothing!
+    // Recursive case for building out the list of source attributes.
     (
-        @ { $($depth:ident)+ } // Depth of the recursion
-        $self:path,            // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-        $($field:ident),+,     // Comma separated field names, which has been passed down unaltered from entry point
-        @{
-            ( )                // Source value. Empty on termination at the given depth
-            ( $($dst:ident)* ) // Destination values.
-        }
-    ) => {};
-
-    // Entry point: start the recursive generation process
-    //
-    // E.g:
-    //
-    // /// Functions to swizzle a `rgb::Rgb`.
-    // (rgb::Rgb, r, g, b) => {
-    //     impl rgb::Rgb {
-    //         swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) })
-    //    }
-    // }
-    (
-        $self:path,              // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-        $($field:ident),+ $(,)?  // Comma separated field names, with an optional trailing comma (e.g `x, y`)
+        $dst_type:path;
+        @bld { $head:ident $(, $tail:ident )* $(,)? }
+        @src { $( ( $( $src_attr:ident ),* ) ),* $(,)? }
+        @dst { $( $dst_attr:ident ),* $(,)? }
+        @out { }
     ) => {
-        paste::paste! {
-            #[doc = "Functions to swizzle a `" ]
-            #[doc = stringify!( $self ) ]
-            #[doc = "`."]
-            #[allow(non_local_definitions)]
-            impl $self {
-                swizzle!(
-                    @ { $($field)+ }    // Copy of fields to be used to count depth of the outer recursion
-                    $self,
-                    $($field),+,        // Original fields list, passed down unaltered to be re-used at each depth
-                    @{
-                        ( $($field)+ )  // Another copy of the fields, used populate the src at each depth
-                        ( )             // Empty tuple for the destination value
-                    }
-                );
+        // Recurse on self with @bld reduced by one and @src extended by one set of @dst attributes.
+        swizzle!(
+            $dst_type;
+            @bld { $( $tail ),* }
+            @src {
+                    ( $( $dst_attr ),* )
+                $(, ( $( $src_attr ),* ) )*
             }
-        }
+            @dst { $( $dst_attr ),* }
+            @out { }
+        );
     };
+
+    // Terminal case for building out the list of source attributes. @bld is empty.
+    (
+        $dst_type:path;
+        @bld { $(,)? }
+        @src { $( ( $( $src_attr:ident ),* ) ),* $(,)? }
+        @dst { $( $dst_attr:ident ),* $(,)? }
+        @out { }
+    ) => {
+        // Call the main generation function with the final lists.
+        swizzle!(
+            $dst_type;
+            @src { $( ( $( $src_attr ),* ) ),*} ;
+            @dst { $( $dst_attr ),* } ;
+            @out { };
+        );
+    };
+
+    // Case for generating multiple swizzle functions where the destination type is created with
+    // attributes set to all combinations of the given source attributes. This method can be used
+    // for converting between different types, with different numbers/names of attributes.
+    // ```
+    // impl Vec3 {
+    //   swizzle!(Vec2 {x: (x, y, z), y: (x, y, z)}) =>
+    //     pub const fn xx(&self) -> Vec2 { Vec2 { x: self.x, y: self.x } }
+    //     pub const fn xy(&self) -> Vec2 { Vec2 { x: self.x, y: self.y } }
+    //     pub const fn xz(&self) -> Vec2 { Vec2 { x: self.x, y: self.z } }
+    //     pub const fn yx(&self) -> Vec2 { Vec2 { x: self.y, y: self.x } }
+    //     pub const fn yy(&self) -> Vec2 { Vec2 { x: self.y, y: self.y } }
+    //     pub const fn yz(&self) -> Vec2 { Vec2 { x: self.y, y: self.z } }
+    //     pub const fn zx(&self) -> Vec2 { Vec2 { x: self.z, y: self.x } }
+    //     pub const fn zy(&self) -> Vec2 { Vec2 { x: self.z, y: self.y } }
+    //     pub const fn zz(&self) -> Vec2 { Vec2 { x: self.z, y: self.z } }
+    // }
+    // ```
+    (
+        $dst_type:path {
+            $(
+                $dst_attr:ident: (
+                    $( $src_attr:ident ),+
+                    $(,)?
+                )
+            ),+
+            $(,)?
+        }
+    ) => {
+        // Reorganize the parameters in the form necessary for the main generation function.
+        swizzle!(
+            $dst_type;
+            @src { $( ( $($src_attr),+ ) ),+ };
+            @dst { $( $dst_attr ),+ };
+            @out { };
+        );
+    };
+
+    // Main recursive case for generating the swizzle functions.
+    (
+        $dst_type:path;
+        @src{
+                (
+                    $src_attr_head_head:ident
+                    $( , $src_attr_head_tail:ident )* $(,)?
+                )
+            $(, ( $( $src_attr_tail:ident ),+ $(,)? ) )*
+            $(,)?
+        };
+        @dst{
+                $dst_attr_head:ident
+            $(, $dst_attr_tail:ident )*
+            $(,)?
+        };
+        @out{
+            $( $out_dst:ident: $out_src:ident ),*
+            $(,)?
+        };
+    ) => {
+        swizzle!(
+            $dst_type;
+            @src {
+                ( $($src_attr_head_tail),* )
+                $( , ( $( $src_attr_tail ),* ) )*
+            };
+            @dst {
+                $dst_attr_head
+                $( , $dst_attr_tail )*
+            };
+            @out {
+                $( $out_dst: $out_src , )*
+            };
+        );
+        swizzle!(
+            $dst_type;
+            @src {
+                $( ( $( $src_attr_tail ),* ) ),*
+            };
+            @dst {
+                $( $dst_attr_tail ),*
+            };
+            @out {
+                $( $out_dst: $out_src , )*
+                $dst_attr_head: $src_attr_head_head
+            };
+        );
+    };
+
+    // Terminal case for when a list of source attributes is empty.
+    (
+        $dst_type:path;
+        @src{
+            ( )
+            $(, ( $( $src_attr_tail:ident ),+ $(,)? ) )*
+            $(,)?
+        };
+        @dst{
+                $dst_attr_head:ident
+            $(, $dst_attr_tail:ident )*
+            $(,)?
+        };
+        @out{
+            $( $out_dst:ident: $out_src:ident ),*
+            $(,)?
+        };
+    ) => {
+    };
+
+
+    // Terminal generation case.
+    (
+        $dst_type:path;
+        @src{ $(,)? };
+        @dst{ $(,)? };
+        @out{ $( $out_dst:ident: $out_src:ident ),+ $(,)? };
+    ) => {
+        swizzle!($dst_type { $( $out_dst: $out_src ),+ });
+    };
+
 }
+
+// macro_rules! swizzle {
+//     // Outer recursion termination case: when depth fields is empty, generate the actual function
+//     (
+//         @{}                       // Depth of recursion: empty/final on function generation
+//         $self:path,               // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+//         $($field:ident),+,        // Comma separated field names, which has been passed down unaltered from entry point
+//         @{
+//             ( $($_:ident)+ )      // Source value. Unused at the final depth
+//             ( $($value:ident)+ )  // Destination values.
+//         }
+//     ) => {
+//         paste::paste! {
+//             #[doc = "Get a new `" ]
+//             #[doc = stringify!( $self ) ]
+//             #[doc = "` with the values swizzled: ["  [< $($value)+ >] ]
+//             #[doc = "]" ]
+//             #[must_use]
+//             #[inline]
+//             pub const fn [< $($value)+ >](&self) -> $self {
+//                 $self { $( $field: self.$value ),* }
+//             }
+//         }
+//     };
+
+//     // Recursive case
+//     //
+//     // E.g:
+//     //
+//     // (@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) }) => {
+//     //     swizzle!(@{g b}, rgb::Rgb, g, b, @{ (g b) (r) })
+//     //     swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) })
+//     // }
+//     (
+//         @ { $depth_head:ident $($depth_tail:ident)* } // Depth of the recursion
+//         $self:path,                                   // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+//         $($field:ident),+,                            // Comma separated field names, which has been passed down unaltered from entry point
+//         @{
+//             ( $src_head:ident $($src_tail:ident)* )   // Source values
+//             ( $($dst:ident)* )                        // Destination values.
+//         }
+//     ) => {
+//         // Outer recursion: Add the src head to the destination, reset the src to the full fields set, and continue at the next depth
+//         swizzle!(
+//             @{ $($depth_tail)* }         // Munch depth
+//             $self,
+//             $($field),+,
+//             @{
+//                 ( $($field)+ )           // Refill the src with all fields
+//                 ( $($dst)* $src_head )   // Add the src head to the destination
+//             }
+//         );
+//         // Inner recursion: Repeat the above process for the tail src fields until they are empty
+//         swizzle!(
+//             @{ $depth_head $($depth_tail)* } // Same depth
+//             $self,
+//             $($field),+,
+//             @{
+//                 ( $($src_tail)* )            // Munch src
+//                 ( $($dst)* )                 // Pass through existing dst
+//             }
+//         );
+//     };
+
+//     // Inner recursion termination case: When no more fields to process at the given depth, do nothing
+//     //
+//     // E.g:
+//     //
+//     // (@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) }) => nothing!
+//     (
+//         @ { $($depth:ident)+ } // Depth of the recursion
+//         $self:path,            // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+//         $($field:ident),+,     // Comma separated field names, which has been passed down unaltered from entry point
+//         @{
+//             ( )                // Source value. Empty on termination at the given depth
+//             ( $($dst:ident)* ) // Destination values.
+//         }
+//     ) => {};
+
+//     // Entry point: start the recursive generation process
+//     //
+//     // E.g:
+//     //
+//     // /// Functions to swizzle a `rgb::Rgb`.
+//     // (rgb::Rgb, r, g, b) => {
+//     //     impl rgb::Rgb {
+//     //         swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) })
+//     //    }
+//     // }
+//     (
+//         $self:path,              // Type path for the `struct`` (e.g `::my_mod::Vec2`)
+//         $($field:ident),+ $(,)?  // Comma separated field names, with an optional trailing comma (e.g `x, y`)
+//     ) => {
+//         paste::paste! {
+//             #[doc = "Functions to swizzle a `" ]
+//             #[doc = stringify!( $self ) ]
+//             #[doc = "`."]
+//             #[allow(non_local_definitions)]
+//             impl $self {
+//                 swizzle!(
+//                     @ { $($field)+ }    // Copy of fields to be used to count depth of the outer recursion
+//                     $self,
+//                     $($field),+,        // Original fields list, passed down unaltered to be re-used at each depth
+//                     @{
+//                         ( $($field)+ )  // Another copy of the fields, used populate the src at each depth
+//                         ( )             // Empty tuple for the destination value
+//                     }
+//                 );
+//             }
+//         }
+//     };
+// }
 
 #[allow(dead_code)]
 #[cfg(test)]
@@ -247,7 +460,9 @@ mod tests {
             a: u8,
         }
 
-        swizzle!(TestStruct, a);
+        impl TestStruct {
+            swizzle!(TestStruct { a });
+        }
 
         let s1 = TestStruct { a: 1 };
         let s1_a = s1.a();
@@ -262,7 +477,9 @@ mod tests {
             b: u8,
         }
 
-        swizzle!(TestStruct, a, b);
+        impl TestStruct {
+            swizzle!(TestStruct { a, b });
+        }
 
         let s2 = TestStruct { a: 1, b: 2 };
 
@@ -293,7 +510,9 @@ mod tests {
             c: u8,
         }
 
-        swizzle!(TestStruct, a, b, c);
+        impl TestStruct {
+            swizzle!(TestStruct { a, b, c });
+        }
 
         let s3 = TestStruct { a: 1, b: 2, c: 3 };
 
@@ -388,7 +607,9 @@ mod tests {
             d: u8,
         }
 
-        swizzle!(TestStruct, a, b, c, d);
+        impl TestStruct {
+            swizzle!(TestStruct { a, b, c, d });
+        }
 
         let s4 = TestStruct {
             a: 1,
@@ -456,7 +677,13 @@ mod tests {
             third: u8,
         }
 
-        swizzle!(CustomStruct, first, second, third);
+        impl CustomStruct {
+            swizzle!(CustomStruct {
+                first,
+                second,
+                third
+            });
+        }
 
         let s = CustomStruct {
             first: 10,
@@ -490,7 +717,9 @@ mod tests {
             e: u8,
         }
 
-        swizzle!(TestStruct, a, b, c, d, e);
+        impl TestStruct {
+            swizzle!(TestStruct { a, b, c, d, e });
+        }
 
         let s5 = TestStruct {
             a: 1,
@@ -598,7 +827,9 @@ mod tests {
             b: &'static str,
         }
 
-        swizzle!(TestStruct, a, b);
+        impl TestStruct {
+            swizzle!(TestStruct { a, b });
+        }
 
         let s = TestStruct { a: "a", b: "b" };
 
@@ -622,7 +853,9 @@ mod tests {
             b: f64,
         }
 
-        swizzle!(TestStruct, a, b);
+        impl TestStruct {
+            swizzle!(TestStruct { a, b });
+        }
 
         let s = TestStruct { a: 1.0, b: 2.0 };
 
@@ -648,14 +881,16 @@ mod tests {
 
     #[test]
     fn test_swizzle_path_to_self() {
-        swizzle!(fixtures::TestStruct, a, b);
+        #[allow(non_local_definitions)]
+        impl fixtures::TestStruct {
+            swizzle!(fixtures::TestStruct { a, b });
+        }
 
         let s = fixtures::TestStruct { a: 1, b: 2 };
 
         let ab = s.ab();
         assert_eq!((ab.a, ab.b), (1, 2));
     }
-
 
     // TODO: Support for generic types; e.g `MyStruct<T>`
     // #[test]
@@ -672,5 +907,4 @@ mod tests {
     //     let ab = s.ab();
     //     assert_eq!((ab.a, ab.b), (1, 2));
     // }
-
 }
