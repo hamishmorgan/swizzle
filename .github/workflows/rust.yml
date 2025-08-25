@@ -36,8 +36,11 @@ jobs:
       run: cargo test --verbose
 
     - name: Lint
-      run: 
+      run: |
         rustup component add clippy
-        cargo clippy --all-targets --all-features --verbose
+        cargo clippy --all-targets --all-features --verbose -- -D warnings
 
-      
+    - name: Check formatting
+      run: |
+        rustup component add rustfmt
+        cargo fmt --all -- --check

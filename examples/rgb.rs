@@ -1,7 +1,5 @@
 use swizzle::swizzle;
 
-
-
 fn main() {
     #[derive(Debug)]
     struct Rgb {
@@ -14,7 +12,11 @@ fn main() {
         swizzle!(Rgb { r, g, b });
     }
 
-    let rgb = Rgb { r: 0.1, g: 0.3, b: 0.7 };
+    let rgb = Rgb {
+        r: 0.1,
+        g: 0.3,
+        b: 0.7,
+    };
 
     print!("rrr: {:?} ", rgb.rrr()); // rrr: Rgb { r: 0.1, g: 0.1, b: 0.1 }
     print!("rrg: {:?} ", rgb.rrg()); // rrg: Rgb { r: 0.1, g: 0.1, b: 0.3 }
