@@ -191,8 +191,18 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 These features are not supported and maybe I'll add them one day:
 
- - Migrate to a stable rust edition/version
+ - Migrate to a stable rust toolchain version
  - Make less useful swizzles a feature that can disabled; e.g `rgb.rgb()` 
  - Structs with field that implement `Clone` but not `Copy`. 
  - Publish a crate and add corresponding installation instructions.
  - Cross-type swizzling could have a better interface: `swizzle!( Vec2 { x, y } { x, y, z } )` instead of `swizzle!( Vec2 { x: (x,y,z), y: (x,y,z) } )`
+ - Add a compile time warning for when generating swizzles for N > 5.
+ - Consolidate documentation between README.md, src/lib.rs, and src/swizzle.rs -- They all same roughly the same thing though with some differences. 
+ - Add documentation fpr error handling: Field types are incompatible, Structs have different field counts, Field names don't match.
+ - Move any remaining TODOs to the repo issue tracker.
+ - Compile time validation, including for failure cases, should be possible with something like ::trybuild
+ - Performance benchmarks. In particular compile time performance benchmarks with ::trybuild would be good to quantify the problem when N grows.
+  - New example: RGBA and RGB. 
+  - Ideally, when fields aren't a single character, the method name should join the fields with underscores.
+  - At a hard limit to the number fields that can be handled. Allow it be overridden with a feature flag.
+  
