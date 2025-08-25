@@ -347,6 +347,8 @@ macro_rules! swizzle {
 #[allow(dead_code)]
 #[cfg(test)]
 mod tests {
+    use core::f32;
+
     #[test]
     fn test_swizzle_struct_1_field() {
         struct TestStruct {
@@ -930,13 +932,13 @@ mod tests {
 
         let source = Source {
             a: 42,
-            b: 3.14,
+            b: f32::consts::PI,
             c: "hello",
         };
         let dest = source.abc();
 
         assert_eq!(dest.x, 42);
-        assert_eq!(dest.y, 3.14);
+        assert_eq!(dest.y, f32::consts::PI);
         assert_eq!(dest.z, "hello");
     }
 
@@ -1169,20 +1171,20 @@ mod tests {
         let bool_struct = BoolStruct { a: true, b: false };
 
         let aa = bool_struct.aa();
-        assert_eq!(aa.a, true);
-        assert_eq!(aa.b, true);
+        assert!(aa.a);
+        assert!(aa.b);
 
         let bb = bool_struct.bb();
-        assert_eq!(bb.a, false);
-        assert_eq!(bb.b, false);
+        assert!(!bb.a);
+        assert!(!bb.b);
 
         let ab = bool_struct.ab();
-        assert_eq!(ab.a, true);
-        assert_eq!(ab.b, false);
+        assert!(ab.a);
+        assert!(!ab.b);
 
         let ba = bool_struct.ba();
-        assert_eq!(ba.a, false);
-        assert_eq!(ba.b, true);
+        assert!(!ba.a);
+        assert!(ba.b);
     }
 
     #[test]
@@ -1471,12 +1473,14 @@ mod tests {
         assert_eq!(aa.b, 1);
 
         // Test that we can clone the result
+        #[allow(clippy::clone_on_copy)]
         let aa_cloned = aa.clone();
         assert_eq!(aa_cloned.a, 1);
         assert_eq!(aa_cloned.b, 1);
     }
 
     // Additional edge case tests
+    #[allow(clippy::unit_cmp)]
     #[test]
     fn test_swizzle_with_unit_types() {
         struct UnitStruct {

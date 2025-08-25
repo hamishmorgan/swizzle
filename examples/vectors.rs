@@ -55,7 +55,7 @@ fn main() {
         z: 3.0,
     };
 
-    println!("v3: {:?}", v3);
+    println!("v3: {v3:?}");
 
     println!("v3.xxx: {:?}", v3.xxx());
     println!("v3.xxy: {:?}", v3.xxy());
@@ -98,7 +98,7 @@ fn main() {
     println!("v3.z: {:?}", v3.z());
 
     let v2 = v3.xy();
-    println!("v2: {:?}", v2);
+    println!("v2: {v2:?}");
 
     println!("v2.xxx: {:?}", v2.xxx());
     println!("v2.xxy: {:?}", v2.xxy());

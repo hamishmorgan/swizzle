@@ -195,3 +195,4 @@ These features are not supported and maybe I'll add them one day:
  - Make less useful swizzles a feature that can disabled; e.g `rgb.rgb()` 
  - Structs with field that implement `Clone` but not `Copy`. 
  - Publish a crate and add corresponding installation instructions.
+ - Cross-type swizzling could have a better interface: `swizzle!( Vec2 { x, y } { x, y, z } )` instead of `swizzle!( Vec2 { x: (x,y,z), y: (x,y,z) } )`
