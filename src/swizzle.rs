@@ -1,7 +1,7 @@
-/// Macro for generating swizzle functions on structs.
+/// Macro for generating swizzle functions of structs.
 ///
-/// The `swizzle!` macro automatically generates functions that allow you to create new instances
-/// of a struct with field values rearranged according to any combination of the original fields.
+/// The `swizzle!` macro generates functions that rearranged the fields in any combination. Swizzles
+/// can also be used to convert between different types, with different numbers/names of attributes.
 /// This is particularly useful for mathematical operations, graphics programming, and data manipulation.
 ///
 /// # How it works
@@ -10,20 +10,23 @@
 /// it creates `n^n` different swizzle functions. Each function returns a new instance of the struct
 /// with the field values arranged according to the function name.
 ///
-/// # Syntax
+/// # Basic Usage
 ///
 /// ```rust
 /// use swizzle::swizzle;
 ///
 /// struct MyStruct {
-///     field1: u8,
-///     field2: u8,
-///     field3: u8,
+///     a: u8,
+///     b: u8,
+///     c: u8,
 /// }
 ///
 /// impl MyStruct {
-///     swizzle!(MyStruct { field1, field2, field3 });
+///     swizzle!(MyStruct { a, b, c });
 /// }
+///
+/// let s = MyStruct { a: 1, b: 2, c: 3 };
+/// let s_swizzled = s.abc(); // MyStruct { a: 1, b: 2, c: 3 }
 /// ```
 ///
 /// # Parameters
