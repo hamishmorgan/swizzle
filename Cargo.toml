@@ -8,7 +8,6 @@ keywords = ["swizzle", "macro", "vector", "graphics", "math", "field-reordering"
 categories = ["development-tools", "graphics", "mathematics"]
 authors = ["Hamish Morgan <hamish.morgan@gmail.com>"]
 license = "MIT"
-license-file = "LICENSE"
 repository = "https://github.com/hamishmorgan/swizzle"
 readme = "README.md"
 
