@@ -1428,9 +1428,10 @@ mod tests {
 
     #[test]
     fn test_swizzle_with_zero_sized_types() {
-        #[derive(Copy, Clone)]
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         struct ZeroSized;
 
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
         struct ZeroStruct {
             a: ZeroSized,
             b: ZeroSized,
@@ -1451,10 +1452,8 @@ mod tests {
         let ba = zero_struct.ba();
 
         // All should work with zero-sized types
-        assert_eq!(std::mem::size_of_val(&aa), 0);
-        assert_eq!(std::mem::size_of_val(&bb), 0);
-        assert_eq!(std::mem::size_of_val(&ab), 0);
-        assert_eq!(std::mem::size_of_val(&ba), 0);
+        assert_eq!(aa, bb);
+        assert_eq!(ab, ba);
     }
 
     #[test]

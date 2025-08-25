@@ -1,3 +1,5 @@
+#![no_std]
+
 //! # Swizzle
 //!
 //! Macro for generating swizzle functions on structs.
