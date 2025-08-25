@@ -13,4 +13,4 @@ repository = "https://github.com/hamishmorgan/swizzle"
 readme = "README.md"
 
 [dependencies]
-paste = "1.0.15"
+paste = { package = "pastey", version = "0.1.1" }
