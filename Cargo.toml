@@ -2,10 +2,13 @@
 name = "swizzle"
 version = "0.2.0"
 edition = "2024"
-description = "A powerful Rust macro for generating swizzle functions on structs"
+rust-version = "1.85.0"
+description = "Rust macro for generating swizzle functions on structs"
 keywords = ["swizzle", "macro", "vector", "graphics", "math", "field-reordering"]
 categories = ["development-tools", "graphics", "mathematics"]
+authors = ["Hamish Morgan <hamish.morgan@gmail.com>"]
 license = "MIT"
+license-file = "LICENSE"
 repository = "https://github.com/hamishmorgan/swizzle"
 readme = "README.md"
 
