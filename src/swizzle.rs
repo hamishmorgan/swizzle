@@ -148,6 +148,11 @@ macro_rules! swizzle {
         }
     ) => {
         paste::paste! {
+            #[doc = "Create an instance of `" ]
+            #[doc = stringify!( $dst_type ) ]
+            #[doc = "` with the values swizzled: ["  [< $($src_attr)+ >] "]" ]
+            #[must_use]
+            #[inline]
             pub const fn [< $($src_attr)+ >](&self) -> $dst_type {
                 $dst_type { $($dst_attr: self.$src_attr),* }
             }
@@ -338,118 +343,6 @@ macro_rules! swizzle {
     };
 
 }
-
-// macro_rules! swizzle {
-//     // Outer recursion termination case: when depth fields is empty, generate the actual function
-//     (
-//         @{}                       // Depth of recursion: empty/final on function generation
-//         $self:path,               // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-//         $($field:ident),+,        // Comma separated field names, which has been passed down unaltered from entry point
-//         @{
-//             ( $($_:ident)+ )      // Source value. Unused at the final depth
-//             ( $($value:ident)+ )  // Destination values.
-//         }
-//     ) => {
-//         paste::paste! {
-//             #[doc = "Get a new `" ]
-//             #[doc = stringify!( $self ) ]
-//             #[doc = "` with the values swizzled: ["  [< $($value)+ >] ]
-//             #[doc = "]" ]
-//             #[must_use]
-//             #[inline]
-//             pub const fn [< $($value)+ >](&self) -> $self {
-//                 $self { $( $field: self.$value ),* }
-//             }
-//         }
-//     };
-
-//     // Recursive case
-//     //
-//     // E.g:
-//     //
-//     // (@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) }) => {
-//     //     swizzle!(@{g b}, rgb::Rgb, g, b, @{ (g b) (r) })
-//     //     swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) })
-//     // }
-//     (
-//         @ { $depth_head:ident $($depth_tail:ident)* } // Depth of the recursion
-//         $self:path,                                   // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-//         $($field:ident),+,                            // Comma separated field names, which has been passed down unaltered from entry point
-//         @{
-//             ( $src_head:ident $($src_tail:ident)* )   // Source values
-//             ( $($dst:ident)* )                        // Destination values.
-//         }
-//     ) => {
-//         // Outer recursion: Add the src head to the destination, reset the src to the full fields set, and continue at the next depth
-//         swizzle!(
-//             @{ $($depth_tail)* }         // Munch depth
-//             $self,
-//             $($field),+,
-//             @{
-//                 ( $($field)+ )           // Refill the src with all fields
-//                 ( $($dst)* $src_head )   // Add the src head to the destination
-//             }
-//         );
-//         // Inner recursion: Repeat the above process for the tail src fields until they are empty
-//         swizzle!(
-//             @{ $depth_head $($depth_tail)* } // Same depth
-//             $self,
-//             $($field),+,
-//             @{
-//                 ( $($src_tail)* )            // Munch src
-//                 ( $($dst)* )                 // Pass through existing dst
-//             }
-//         );
-//     };
-
-//     // Inner recursion termination case: When no more fields to process at the given depth, do nothing
-//     //
-//     // E.g:
-//     //
-//     // (@{r g b}, rgb::Rgb, r, g, b, @{ ( ) (r g b) }) => nothing!
-//     (
-//         @ { $($depth:ident)+ } // Depth of the recursion
-//         $self:path,            // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-//         $($field:ident),+,     // Comma separated field names, which has been passed down unaltered from entry point
-//         @{
-//             ( )                // Source value. Empty on termination at the given depth
-//             ( $($dst:ident)* ) // Destination values.
-//         }
-//     ) => {};
-
-//     // Entry point: start the recursive generation process
-//     //
-//     // E.g:
-//     //
-//     // /// Functions to swizzle a `rgb::Rgb`.
-//     // (rgb::Rgb, r, g, b) => {
-//     //     impl rgb::Rgb {
-//     //         swizzle!(@{r g b}, rgb::Rgb, r, g, b, @{ (r g b) ( ) })
-//     //    }
-//     // }
-//     (
-//         $self:path,              // Type path for the `struct`` (e.g `::my_mod::Vec2`)
-//         $($field:ident),+ $(,)?  // Comma separated field names, with an optional trailing comma (e.g `x, y`)
-//     ) => {
-//         paste::paste! {
-//             #[doc = "Functions to swizzle a `" ]
-//             #[doc = stringify!( $self ) ]
-//             #[doc = "`."]
-//             #[allow(non_local_definitions)]
-//             impl $self {
-//                 swizzle!(
-//                     @ { $($field)+ }    // Copy of fields to be used to count depth of the outer recursion
-//                     $self,
-//                     $($field),+,        // Original fields list, passed down unaltered to be re-used at each depth
-//                     @{
-//                         ( $($field)+ )  // Another copy of the fields, used populate the src at each depth
-//                         ( )             // Empty tuple for the destination value
-//                     }
-//                 );
-//             }
-//         }
-//     };
-// }
 
 #[allow(dead_code)]
 #[cfg(test)]
@@ -892,19 +785,828 @@ mod tests {
         assert_eq!((ab.a, ab.b), (1, 2));
     }
 
-    // TODO: Support for generic types; e.g `MyStruct<T>`
-    // #[test]
-    // fn test_swizzle_with_generic_field_types() {
-    //     struct TestStruct<T> {
-    //         a: T,
-    //         b: T,
-    //     }
+    // Type conversion tests - converting between different structs with different field counts
+    #[test]
+    fn test_swizzle_type_conversion_scalar_to_vec2() {
+        struct Scalar {
+            x: f32,
+        }
 
-    //     swizzle!(TestStruct<T>, a, b);
+        struct Vec2 {
+            x: f32,
+            y: f32,
+        }
 
-    //     let s = TestStruct { a: 1, b: 2 };
+        impl Scalar {
+            swizzle!(Vec2 { x: (x), y: (x) });
+        }
 
-    //     let ab = s.ab();
-    //     assert_eq!((ab.a, ab.b), (1, 2));
-    // }
+        let scalar = Scalar { x: 5.0 };
+        let vec2 = scalar.xx();
+
+        assert_eq!(vec2.x, 5.0);
+        assert_eq!(vec2.y, 5.0);
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_scalar_to_vec3() {
+        struct Scalar {
+            x: f32,
+        }
+
+        struct Vec3 {
+            x: f32,
+            y: f32,
+            z: f32,
+        }
+
+        impl Scalar {
+            swizzle!(Vec3 {
+                x: (x),
+                y: (x),
+                z: (x)
+            });
+        }
+
+        let scalar = Scalar { x: 3.0 };
+        let vec3 = scalar.xxx();
+
+        assert_eq!(vec3.x, 3.0);
+        assert_eq!(vec3.y, 3.0);
+        assert_eq!(vec3.z, 3.0);
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_vec2_to_scalar() {
+        struct Vec2 {
+            x: f32,
+            y: f32,
+        }
+
+        struct Scalar {
+            x: f32,
+        }
+
+        impl Vec2 {
+            swizzle!(Scalar { x: (x, y) });
+        }
+
+        let vec2 = Vec2 { x: 1.0, y: 2.0 };
+
+        let scalar_x = vec2.x();
+        assert_eq!(scalar_x.x, 1.0);
+
+        let scalar_y = vec2.y();
+        assert_eq!(scalar_y.x, 2.0);
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_vec2_to_vec3() {
+        struct Vec2 {
+            x: f32,
+            y: f32,
+        }
+
+        struct Vec3 {
+            x: f32,
+            y: f32,
+            z: f32,
+        }
+
+        impl Vec2 {
+            swizzle!(Vec3 {
+                x: (x, y),
+                y: (x, y),
+                z: (x, y)
+            });
+        }
+
+        let vec2 = Vec2 { x: 1.0, y: 2.0 };
+
+        // Test that we can create Vec3 from Vec2 using swizzle
+        // The macro generates methods like xxx(), xxy(), etc.
+        let vec3_xxx = vec2.xxx();
+        assert_eq!(vec3_xxx.x, 1.0);
+        assert_eq!(vec3_xxx.y, 1.0);
+        assert_eq!(vec3_xxx.z, 1.0);
+
+        let vec3_xxy = vec2.xxy();
+        assert_eq!(vec3_xxy.x, 1.0);
+        assert_eq!(vec3_xxy.y, 1.0);
+        assert_eq!(vec3_xxy.z, 2.0);
+
+        let vec3_xyx = vec2.xyx();
+        assert_eq!(vec3_xyx.x, 1.0);
+        assert_eq!(vec3_xyx.y, 2.0);
+        assert_eq!(vec3_xyx.z, 1.0);
+
+        let vec3_xyy = vec2.xyy();
+        assert_eq!(vec3_xyy.x, 1.0);
+        assert_eq!(vec3_xyy.y, 2.0);
+        assert_eq!(vec3_xyy.z, 2.0);
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_mixed_types() {
+        struct Source {
+            a: u8,
+            b: f32,
+            c: &'static str,
+        }
+
+        struct Dest {
+            x: u8,
+            y: f32,
+            z: &'static str,
+        }
+
+        impl Source {
+            swizzle!(Dest {
+                x: (a),
+                y: (b),
+                z: (c)
+            });
+        }
+
+        let source = Source {
+            a: 42,
+            b: 3.14,
+            c: "hello",
+        };
+        let dest = source.abc();
+
+        assert_eq!(dest.x, 42);
+        assert_eq!(dest.y, 3.14);
+        assert_eq!(dest.z, "hello");
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_different_field_counts() {
+        struct Vec4 {
+            x: f32,
+            y: f32,
+            z: f32,
+            w: f32,
+        }
+
+        struct Vec2 {
+            x: f32,
+            y: f32,
+        }
+
+        impl Vec4 {
+            swizzle!(Vec2 {
+                x: (x, y, z, w),
+                y: (x, y, z, w)
+            });
+        }
+
+        let vec4 = Vec4 {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+            w: 4.0,
+        };
+
+        // Test some key combinations - the macro generates methods like xx(), xy(), etc.
+        let vec2_xx = vec4.xx();
+        assert_eq!(vec2_xx.x, 1.0);
+        assert_eq!(vec2_xx.y, 1.0);
+
+        let vec2_xy = vec4.xy();
+        assert_eq!(vec2_xy.x, 1.0);
+        assert_eq!(vec2_xy.y, 2.0);
+
+        let vec2_zw = vec4.zw();
+        assert_eq!(vec2_zw.x, 3.0);
+        assert_eq!(vec2_zw.y, 4.0);
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_with_self_swizzle() {
+        struct Vec3 {
+            x: f32,
+            y: f32,
+            z: f32,
+        }
+
+        struct Vec2 {
+            x: f32,
+            y: f32,
+        }
+
+        impl Vec3 {
+            // Self-swizzle methods
+            swizzle!(Vec3 { x, y, z });
+            // Conversion to Vec2
+            swizzle!(Vec2 {
+                x: (x, y, z),
+                y: (x, y, z)
+            });
+        }
+
+        let vec3 = Vec3 {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        };
+
+        // Test self-swizzle
+        let vec3_zyx = vec3.zyx();
+        assert_eq!((vec3_zyx.x, vec3_zyx.y, vec3_zyx.z), (3.0, 2.0, 1.0));
+
+        // Test conversion to Vec2
+        let vec2_xy = vec3.xy();
+        assert_eq!((vec2_xy.x, vec2_xy.y), (1.0, 2.0));
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_edge_cases() {
+        struct Single {
+            x: u8,
+        }
+
+        struct Double {
+            a: u8,
+            b: u8,
+        }
+
+        impl Single {
+            swizzle!(Double { a: (x), b: (x) });
+        }
+
+        let single = Single { x: 255 };
+        let double = single.xx();
+
+        assert_eq!(double.a, 255);
+        assert_eq!(double.b, 255);
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_large_to_small() {
+        struct Vec5 {
+            a: u8,
+            b: u8,
+            c: u8,
+            d: u8,
+            e: u8,
+        }
+
+        struct Vec2 {
+            x: u8,
+            y: u8,
+        }
+
+        impl Vec5 {
+            swizzle!(Vec2 {
+                x: (a, b, c, d, e),
+                y: (a, b, c, d, e)
+            });
+        }
+
+        let vec5 = Vec5 {
+            a: 1,
+            b: 2,
+            c: 3,
+            d: 4,
+            e: 5,
+        };
+
+        let vec2_aa = vec5.aa();
+        assert_eq!((vec2_aa.x, vec2_aa.y), (1, 1));
+
+        let vec2_ab = vec5.ab();
+        assert_eq!((vec2_ab.x, vec2_ab.y), (1, 2));
+
+        let vec2_ee = vec5.ee();
+        assert_eq!((vec2_ee.x, vec2_ee.y), (5, 5));
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_with_custom_types() {
+        #[derive(Debug, PartialEq)]
+        struct Color {
+            r: u8,
+            g: u8,
+            b: u8,
+        }
+
+        #[derive(Debug, PartialEq)]
+        struct Grayscale {
+            value: u8,
+        }
+
+        impl Color {
+            swizzle!(Grayscale { value: (r, g, b) });
+        }
+
+        let color = Color {
+            r: 100,
+            g: 150,
+            b: 200,
+        };
+
+        let gray_r = color.r();
+        assert_eq!(gray_r.value, 100);
+
+        let gray_g = color.g();
+        assert_eq!(gray_g.value, 150);
+
+        let gray_b = color.b();
+        assert_eq!(gray_b.value, 200);
+    }
+
+    #[test]
+    fn test_swizzle_type_conversion_chain() {
+        struct Vec1 {
+            x: f32,
+        }
+
+        struct Vec2 {
+            x: f32,
+            y: f32,
+        }
+
+        struct Vec3 {
+            x: f32,
+            y: f32,
+            z: f32,
+        }
+
+        impl Vec1 {
+            swizzle!(Vec2 { x: (x), y: (x) });
+        }
+
+        impl Vec2 {
+            swizzle!(Vec3 {
+                x: (x, y),
+                y: (x, y),
+                z: (x, y)
+            });
+        }
+
+        let vec1 = Vec1 { x: 42.0 };
+        let vec2 = vec1.xx();
+        let vec3 = vec2.xxx();
+
+        assert_eq!(vec3.x, 42.0);
+        assert_eq!(vec3.y, 42.0);
+        assert_eq!(vec3.z, 42.0);
+    }
+
+    // Additional comprehensive tests for edge cases and complex scenarios
+    #[test]
+    fn test_swizzle_with_boolean_types() {
+        struct BoolStruct {
+            a: bool,
+            b: bool,
+        }
+
+        impl BoolStruct {
+            swizzle!(BoolStruct { a, b });
+        }
+
+        let bool_struct = BoolStruct { a: true, b: false };
+
+        let aa = bool_struct.aa();
+        assert_eq!(aa.a, true);
+        assert_eq!(aa.b, true);
+
+        let bb = bool_struct.bb();
+        assert_eq!(bb.a, false);
+        assert_eq!(bb.b, false);
+
+        let ab = bool_struct.ab();
+        assert_eq!(ab.a, true);
+        assert_eq!(ab.b, false);
+
+        let ba = bool_struct.ba();
+        assert_eq!(ba.a, false);
+        assert_eq!(ba.b, true);
+    }
+
+    #[test]
+    fn test_swizzle_with_option_types() {
+        struct OptionStruct {
+            a: Option<u8>,
+            b: Option<u8>,
+        }
+
+        impl OptionStruct {
+            swizzle!(OptionStruct { a, b });
+        }
+
+        let opt_struct = OptionStruct {
+            a: Some(42),
+            b: None,
+        };
+
+        let aa = opt_struct.aa();
+        assert_eq!(aa.a, Some(42));
+        assert_eq!(aa.b, Some(42));
+
+        let bb = opt_struct.bb();
+        assert_eq!(bb.a, None);
+        assert_eq!(bb.b, None);
+
+        let ab = opt_struct.ab();
+        assert_eq!(ab.a, Some(42));
+        assert_eq!(ab.b, None);
+
+        let ba = opt_struct.ba();
+        assert_eq!(ba.a, None);
+        assert_eq!(ba.b, Some(42));
+    }
+
+    #[test]
+    fn test_swizzle_with_reference_types() {
+        struct RefStruct<'a> {
+            a: &'a str,
+            b: &'a str,
+        }
+
+        impl<'a> RefStruct<'a> {
+            swizzle!(RefStruct<'a> { a, b });
+        }
+
+        let s1 = "hello";
+        let s2 = "world";
+        let ref_struct = RefStruct { a: s1, b: s2 };
+
+        let aa = ref_struct.aa();
+        assert_eq!(aa.a, "hello");
+        assert_eq!(aa.b, "hello");
+
+        let bb = ref_struct.bb();
+        assert_eq!(bb.a, "world");
+        assert_eq!(bb.b, "world");
+
+        let ab = ref_struct.ab();
+        assert_eq!(ab.a, "hello");
+        assert_eq!(ab.b, "world");
+
+        let ba = ref_struct.ba();
+        assert_eq!(ba.a, "world");
+        assert_eq!(ba.b, "hello");
+    }
+
+    #[test]
+    fn test_swizzle_with_array_types() {
+        struct ArrayStruct {
+            a: [u8; 2],
+            b: [u8; 2],
+        }
+
+        impl ArrayStruct {
+            swizzle!(ArrayStruct { a, b });
+        }
+
+        let array_struct = ArrayStruct {
+            a: [1, 2],
+            b: [3, 4],
+        };
+
+        let aa = array_struct.aa();
+        assert_eq!(aa.a, [1, 2]);
+        assert_eq!(aa.b, [1, 2]);
+
+        let bb = array_struct.bb();
+        assert_eq!(bb.a, [3, 4]);
+        assert_eq!(bb.b, [3, 4]);
+
+        let ab = array_struct.ab();
+        assert_eq!(ab.a, [1, 2]);
+        assert_eq!(ab.b, [3, 4]);
+
+        let ba = array_struct.ba();
+        assert_eq!(ba.a, [3, 4]);
+        assert_eq!(ba.b, [1, 2]);
+    }
+
+    #[test]
+    fn test_swizzle_with_tuple_types() {
+        struct TupleStruct {
+            a: (u8, u8),
+            b: (u8, u8),
+        }
+
+        impl TupleStruct {
+            swizzle!(TupleStruct { a, b });
+        }
+
+        let tuple_struct = TupleStruct {
+            a: (1, 2),
+            b: (3, 4),
+        };
+
+        let aa = tuple_struct.aa();
+        assert_eq!(aa.a, (1, 2));
+        assert_eq!(aa.b, (1, 2));
+
+        let bb = tuple_struct.bb();
+        assert_eq!(bb.a, (3, 4));
+        assert_eq!(bb.b, (3, 4));
+
+        let ab = tuple_struct.ab();
+        assert_eq!(ab.a, (1, 2));
+        assert_eq!(ab.b, (3, 4));
+
+        let ba = tuple_struct.ba();
+        assert_eq!(ba.a, (3, 4));
+        assert_eq!(ba.b, (1, 2));
+    }
+
+    #[test]
+    fn test_swizzle_with_nested_structs() {
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        struct Inner {
+            x: u8,
+            y: u8,
+        }
+
+        #[derive(Debug, PartialEq)]
+        struct Outer {
+            a: Inner,
+            b: Inner,
+        }
+
+        impl Outer {
+            swizzle!(Outer { a, b });
+        }
+
+        let outer = Outer {
+            a: Inner { x: 1, y: 2 },
+            b: Inner { x: 3, y: 4 },
+        };
+
+        let aa = outer.aa();
+        assert_eq!(aa.a, Inner { x: 1, y: 2 });
+        assert_eq!(aa.b, Inner { x: 1, y: 2 });
+
+        let bb = outer.bb();
+        assert_eq!(bb.a, Inner { x: 3, y: 4 });
+        assert_eq!(bb.b, Inner { x: 3, y: 4 });
+
+        let ab = outer.ab();
+        assert_eq!(ab.a, Inner { x: 1, y: 2 });
+        assert_eq!(ab.b, Inner { x: 3, y: 4 });
+
+        let ba = outer.ba();
+        assert_eq!(ba.a, Inner { x: 3, y: 4 });
+        assert_eq!(ba.b, Inner { x: 1, y: 2 });
+    }
+
+    #[test]
+    fn test_swizzle_with_generic_types() {
+        struct GenericStruct<T> {
+            a: T,
+            b: T,
+        }
+
+        impl<T: Copy> GenericStruct<T> {
+            swizzle!(GenericStruct<T> { a, b });
+        }
+
+        let generic_u8 = GenericStruct { a: 1u8, b: 2u8 };
+        let aa_u8 = generic_u8.aa();
+        assert_eq!(aa_u8.a, 1);
+        assert_eq!(aa_u8.b, 1);
+
+        let generic_f32 = GenericStruct {
+            a: 1.0f32,
+            b: 2.0f32,
+        };
+        let bb_f32 = generic_f32.bb();
+        assert_eq!(bb_f32.a, 2.0);
+        assert_eq!(bb_f32.b, 2.0);
+    }
+
+    #[test]
+    fn test_swizzle_with_const_context() {
+        struct ConstStruct {
+            a: u8,
+            b: u8,
+        }
+
+        impl ConstStruct {
+            swizzle!(ConstStruct { a, b });
+        }
+
+        const fn create_swizzled() -> ConstStruct {
+            let s = ConstStruct { a: 1, b: 2 };
+            s.aa()
+        }
+
+        const RESULT: ConstStruct = create_swizzled();
+        assert_eq!(RESULT.a, 1);
+        assert_eq!(RESULT.b, 1);
+    }
+
+    #[test]
+    fn test_swizzle_with_method_chaining() {
+        struct ChainStruct {
+            a: u8,
+            b: u8,
+            c: u8,
+        }
+
+        impl ChainStruct {
+            swizzle!(ChainStruct { a, b, c });
+        }
+
+        let chain = ChainStruct { a: 1, b: 2, c: 3 };
+
+        // Test method chaining
+        let result = chain.abc().cba().bac();
+        assert_eq!((result.a, result.b, result.c), (2, 3, 1));
+    }
+
+    #[test]
+    fn test_swizzle_with_zero_sized_types() {
+        #[derive(Copy, Clone)]
+        struct ZeroSized;
+
+        struct ZeroStruct {
+            a: ZeroSized,
+            b: ZeroSized,
+        }
+
+        impl ZeroStruct {
+            swizzle!(ZeroStruct { a, b });
+        }
+
+        let zero_struct = ZeroStruct {
+            a: ZeroSized,
+            b: ZeroSized,
+        };
+
+        let aa = zero_struct.aa();
+        let bb = zero_struct.bb();
+        let ab = zero_struct.ab();
+        let ba = zero_struct.ba();
+
+        // All should work with zero-sized types
+        assert_eq!(std::mem::size_of_val(&aa), 0);
+        assert_eq!(std::mem::size_of_val(&bb), 0);
+        assert_eq!(std::mem::size_of_val(&ab), 0);
+        assert_eq!(std::mem::size_of_val(&ba), 0);
+    }
+
+    #[test]
+    fn test_swizzle_with_copy_and_clone() {
+        #[derive(Debug, PartialEq, Clone, Copy)]
+        struct CopyStruct {
+            a: u8,
+            b: u8,
+        }
+
+        impl CopyStruct {
+            swizzle!(CopyStruct { a, b });
+        }
+
+        let copy_struct = CopyStruct { a: 1, b: 2 };
+
+        let aa = copy_struct.aa();
+        assert_eq!(aa.a, 1);
+        assert_eq!(aa.b, 1);
+
+        // Test that we can clone the result
+        let aa_cloned = aa.clone();
+        assert_eq!(aa_cloned.a, 1);
+        assert_eq!(aa_cloned.b, 1);
+    }
+
+    // Additional edge case tests
+    #[test]
+    fn test_swizzle_with_unit_types() {
+        struct UnitStruct {
+            a: (),
+            b: (),
+        }
+
+        impl UnitStruct {
+            swizzle!(UnitStruct { a, b });
+        }
+
+        let unit_struct = UnitStruct { a: (), b: () };
+
+        let aa = unit_struct.aa();
+        assert_eq!(aa.a, ());
+        assert_eq!(aa.b, ());
+
+        let bb = unit_struct.bb();
+        assert_eq!(bb.a, ());
+        assert_eq!(bb.b, ());
+
+        let ab = unit_struct.ab();
+        assert_eq!(ab.a, ());
+        assert_eq!(ab.b, ());
+
+        let ba = unit_struct.ba();
+        assert_eq!(ba.a, ());
+        assert_eq!(ba.b, ());
+    }
+
+    #[test]
+    fn test_swizzle_with_char_types() {
+        struct CharStruct {
+            a: char,
+            b: char,
+        }
+
+        impl CharStruct {
+            swizzle!(CharStruct { a, b });
+        }
+
+        let char_struct = CharStruct { a: 'x', b: 'y' };
+
+        let aa = char_struct.aa();
+        assert_eq!(aa.a, 'x');
+        assert_eq!(aa.b, 'x');
+
+        let bb = char_struct.bb();
+        assert_eq!(bb.a, 'y');
+        assert_eq!(bb.b, 'y');
+
+        let ab = char_struct.ab();
+        assert_eq!(ab.a, 'x');
+        assert_eq!(ab.b, 'y');
+
+        let ba = char_struct.ba();
+        assert_eq!(ba.a, 'y');
+        assert_eq!(ba.b, 'x');
+    }
+
+    #[test]
+    fn test_swizzle_with_enum_types() {
+        #[derive(Debug, PartialEq, Copy, Clone)]
+        enum TestEnum {
+            A,
+            B,
+            C,
+        }
+
+        struct EnumStruct {
+            a: TestEnum,
+            b: TestEnum,
+        }
+
+        impl EnumStruct {
+            swizzle!(EnumStruct { a, b });
+        }
+
+        let enum_struct = EnumStruct {
+            a: TestEnum::A,
+            b: TestEnum::B,
+        };
+
+        let aa = enum_struct.aa();
+        assert_eq!(aa.a, TestEnum::A);
+        assert_eq!(aa.b, TestEnum::A);
+
+        let bb = enum_struct.bb();
+        assert_eq!(bb.a, TestEnum::B);
+        assert_eq!(bb.b, TestEnum::B);
+
+        let ab = enum_struct.ab();
+        assert_eq!(ab.a, TestEnum::A);
+        assert_eq!(ab.b, TestEnum::B);
+
+        let ba = enum_struct.ba();
+        assert_eq!(ba.a, TestEnum::B);
+        assert_eq!(ba.b, TestEnum::A);
+    }
+
+    #[test]
+    fn test_swizzle_with_const_generics() {
+        struct ArrayStruct<const N: usize> {
+            a: [u8; N],
+            b: [u8; N],
+        }
+
+        impl<const N: usize> ArrayStruct<N> {
+            swizzle!(ArrayStruct<N> { a, b });
+        }
+
+        let array_struct = ArrayStruct {
+            a: [1, 2],
+            b: [3, 4],
+        };
+
+        let aa = array_struct.aa();
+        assert_eq!(aa.a, [1, 2]);
+        assert_eq!(aa.b, [1, 2]);
+
+        let bb = array_struct.bb();
+        assert_eq!(bb.a, [3, 4]);
+        assert_eq!(bb.b, [3, 4]);
+
+        let ab = array_struct.ab();
+        assert_eq!(ab.a, [1, 2]);
+        assert_eq!(ab.b, [3, 4]);
+
+        let ba = array_struct.ba();
+        assert_eq!(ba.a, [3, 4]);
+        assert_eq!(ba.b, [1, 2]);
+    }
 }

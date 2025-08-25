@@ -9,15 +9,6 @@ Rust macro for generating swizzle functions on structs. The `swizzle!` macro aut
 
 Swizzling is a technique commonly used in graphics programming where you can access and reorder vector components in any combination. For example, with a 3D vector `(x, y, z)`, you might want to create a new vector with values `(y, x, z)` or `(x, x, x)`.
 
-## Installation
-
-Add this to your `Cargo.toml`:
-
-```toml
-[dependencies]
-swizzle = "0.2.0"
-```
-
 ## Quick Start
 
 ```rust
@@ -177,17 +168,16 @@ This creates functions that return `TargetStruct` with values from the source st
 
 - All generated functions are `#[inline]` for optimal performance
 - Functions are marked as `#[must_use]` to prevent accidental discarding of results
-- All generated functions are `const fn` for use in const contexts
-- The macro generates `n^n` functions for a struct with `n` fields
-- For large numbers of fields, consider the compilation time impact
+- All generated functions are `const fn` for use in const contexts.
+- The macro generates `n^m` functions, where `n` is the number of the destination attributes and `m` is the number of source attributes. 
+- For large numbers of fields, consider the compilation time impact. On modern hardware 5 fields in manageable, but is _extremely_ slow!
 
 ## Limitations
 
-- Field names must be valid Rust identifiers
-- All fields must be of types that can be copied
-- The macro generates a lot of functions for structs with many fields
-- Field order in the struct definition matters for the generated function names
-- Cross-type swizzling requires compatible field types
+- Field names must be valid Rust identifiers.
+- All fields must be of a type that can be copied.
+- The macro generates a _lot_ of functions for structs with many fields. This can take a long time.
+- Cross-type swizzling requires compatible field types that are either the same or that can be converted implicitly. 
 
 ## Dependencies
 
@@ -201,9 +191,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 These features are not supported and maybe I'll add them one day:
 
- - Migrate to a stand rust edition/version
- - Generic types; e.g `MyStruct<T>`
- - Shortening swizzles; e.g `let v: Vec2 = Vec3 {x:1, y:2, z:3}.xy()`
- - Extending swizzles; e.g `let v: Vec3 = Vec2 {x:1, y:2}.xxy()`
+ - Migrate to a stable rust edition/version
  - Make less useful swizzles a feature that can disabled; e.g `rgb.rgb()` 
  - Structs with field that implement `Clone` but not `Copy`. 
+ - Publish a crate and add corresponding installation instructions.
